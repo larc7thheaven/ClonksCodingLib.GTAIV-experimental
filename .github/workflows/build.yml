@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [ ce-1.2.0.59 ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # IVSDKDotNetWrapper.dll is only needed as a compile reference; take it from the official release (pinned by hash).
+  BASE_RELEASE_URL: https://github.com/ClonkAndre/IV-SDK-DotNet/releases/download/1.9.1/IV-SDK.NET.v1.9.1.zip
+  BASE_RELEASE_SHA256: d0ccf6c0c5d87b29d0337eba86947f00c3bb7bf09ad5e355a9bafcb86f7ca973
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get IVSDKDotNetWrapper reference
+        shell: pwsh
+        run: |
+          curl.exe -L --fail -o base.zip "$env:BASE_RELEASE_URL"
+          $h = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne $env:BASE_RELEASE_SHA256) { throw "Base release hash mismatch: $h" }
+          7z x base.zip IVSDKDotNetWrapper.dll -o_base -y | Out-Null
+          # the csproj HintPath is ..\..\..\IVSDKDotNet\Debug\IVSDKDotNetWrapper.dll (relative to the project folder)
+          $dst = Join-Path (Split-Path "${{ github.workspace }}") "IVSDKDotNet\Debug"
+          New-Item -ItemType Directory -Force $dst | Out-Null
+          Copy-Item _base/IVSDKDotNetWrapper.dll $dst
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build
+        run: msbuild ClonksCodingLib.GTAIV\ClonksCodingLib.GTAIV.sln /m /nologo /v:minimal /p:Configuration=Release /p:Platform=x86
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClonksCodingLib.GTAIV
+          path: |
+            ClonksCodingLib.GTAIV/ClonksCodingLib.GTAIV/bin/x86/Release/ClonksCodingLib.GTAIV.dll
+            ClonksCodingLib.GTAIV/ClonksCodingLib.GTAIV/bin/x86/Release/ClonksCodingLib.GTAIV.xml
+            ClonksCodingLib.GTAIV/ClonksCodingLib.GTAIV/bin/x86/Release/ClonksCodingLib.GTAIV.pdb

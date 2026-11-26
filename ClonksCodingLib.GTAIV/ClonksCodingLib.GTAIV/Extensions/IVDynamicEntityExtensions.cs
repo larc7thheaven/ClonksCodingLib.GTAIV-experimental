@@ -36,6 +36,10 @@ namespace CCL.GTAIV.Extensions
                     setAnimTimeFunc =   Marshal.GetDelegateForFunctionPointer<SetAnimTimeDelegate>(new IntPtr(MemoryAccess.GetAbsoluteAddress(0x633E00)));
                     setAnimSpeedFunc =  Marshal.GetDelegateForFunctionPointer<SetAnimSpeedDelegate>(new IntPtr(MemoryAccess.GetAbsoluteAddress(0x633E80)));
                     break;
+                case eGameVersion.VERSION_12059: // Complete Edition 1.2.0.59, ported from 1.0.8.0 (same __thiscall signatures)
+                    setAnimTimeFunc =   Marshal.GetDelegateForFunctionPointer<SetAnimTimeDelegate>(new IntPtr(MemoryAccess.GetAbsoluteAddress(0x862CD0)));
+                    setAnimSpeedFunc =  Marshal.GetDelegateForFunctionPointer<SetAnimSpeedDelegate>(new IntPtr(MemoryAccess.GetAbsoluteAddress(0x862BC0)));
+                    break;
             }
         }
         #endregion
