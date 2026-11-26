@@ -18,7 +18,7 @@ namespace CCL.GTAIV
         /// <returns>A <see cref="Vector3"/> with random X, Y and Z values.</returns>
         public static Vector3 RandomXYZ(this Vector3 vec)
         {
-            Random rnd = new Random();
+            Random rnd = InternalHelper.Random;
             float x = (float)(rnd.NextDouble() - 0.5);
             float y = (float)(rnd.NextDouble() - 0.5);
             float z = (float)(rnd.NextDouble() - 0.5);
@@ -32,7 +32,7 @@ namespace CCL.GTAIV
         /// <returns>A <see cref="Vector3"/> with random X and Y values.</returns>
         public static Vector3 RandomXY(this Vector3 vec)
         {
-            Random rnd = new Random();
+            Random rnd = InternalHelper.Random;
             float x = (float)(rnd.NextDouble() - 0.5);
             float y = (float)(rnd.NextDouble() - 0.5);
             return Vector3.Normalize(new Vector3(x, y, 0f));

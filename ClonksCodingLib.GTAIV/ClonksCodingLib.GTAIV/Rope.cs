@@ -26,6 +26,7 @@ namespace CCL.GTAIV
         // Variables
         private Vector3 _startingPosition;
         private List<IVObject> ropeObjects;
+        private List<int> ropeObjectHandles; // same order as ropeObjects; handles never change, so no pool lookup per frame
         private ReadOnlyCollection<IVObject> readonlyRopeObjects;
 
         // Model
@@ -217,6 +218,7 @@ namespace CCL.GTAIV
         {
             _startingPosition = startingPos;
             ropeObjects = new List<IVObject>();
+            ropeObjectHandles = new List<int>();
         }
         #endregion
 
@@ -283,17 +285,15 @@ namespace CCL.GTAIV
         /// </summary>
         public void Delete()
         {
-            for (int i = 0; i < ropeObjects.Count; i++)
+            for (int i = 0; i < ropeObjectHandles.Count; i++)
             {
-                IVObject obj = ropeObjects[i];
-
-                int handle = obj.GetHandle();
+                int handle = ropeObjectHandles[i];
                 MARK_OBJECT_AS_NO_LONGER_NEEDED(handle);
                 DELETE_OBJECT(ref handle);
-
-                ropeObjects.RemoveAt(i);
-                i--;
             }
+
+            ropeObjects.Clear();
+            ropeObjectHandles.Clear();
         }
 
         /// <summary>
@@ -371,17 +371,22 @@ namespace CCL.GTAIV
             if (overridePos != default)
                 firstRopePos = overridePos;
 
+            // Same for every rope object this frame
+            float windSin = (float)Math.Sin(_windTime);
+            float windCos = (float)Math.Cos(_windTime);
+            Vector3 ropeStart = firstRopePos - new Vector3(0f, 0f, RopeModelSize.Z);
+
             // Go through all rope objects and update their position and wind effect
             for (int i = 0; i < ropeObjects.Count; i++)
             {
-                IVObject rope = ropeObjects[i];
+                int ropeHandle = ropeObjectHandles[i];
 
                 if (ShowRopePoints)
-                    DRAW_CORONA(rope.Matrix.Pos, 40f, 0, 0, Color.Red);
+                    DRAW_CORONA(ropeObjects[i].Matrix.Pos, 40f, 0, 0, Color.Red);
 
                 // Add a swinging in wind effect
-                float windOffsetX = (float)Math.Sin(_windTime) * i * WindAmplitude;
-                float windOffsetY = (float)Math.Cos(_windTime) * i * WindAmplitude;
+                float windOffsetX = windSin * i * WindAmplitude;
+                float windOffsetY = windCos * i * WindAmplitude;
                 Vector3 windEffect = new Vector3(windOffsetX, windOffsetY, 0f);
 
                 // Calculate position of rope
@@ -392,17 +397,17 @@ namespace CCL.GTAIV
                 {
                     case RopeDeploymentState.Instant:
                     case RopeDeploymentState.Deployed:
-                        SET_OBJECT_COORDINATES(rope.GetHandle(), Vector3.Lerp(firstRopePos - new Vector3(0f, 0f, RopeModelSize.Z), targetPosition, 1f));
+                        SET_OBJECT_COORDINATES(ropeHandle, Vector3.Lerp(ropeStart, targetPosition, 1f));
                         break;
                     case RopeDeploymentState.Undeployed:
-                        SET_OBJECT_COORDINATES(rope.GetHandle(), Vector3.Lerp(firstRopePos - new Vector3(0f, 0f, RopeModelSize.Z), targetPosition, 0f));
+                        SET_OBJECT_COORDINATES(ropeHandle, Vector3.Lerp(ropeStart, targetPosition, 0f));
                         break;
 
                     case RopeDeploymentState.Deploying:
-                        SET_OBJECT_COORDINATES(rope.GetHandle(), Vector3.Lerp(firstRopePos - new Vector3(0f, 0f, RopeModelSize.Z), targetPosition + AttachOffset, _deploymentTime.EaseOut(DeploymentAnimEasingValue)));
+                        SET_OBJECT_COORDINATES(ropeHandle, Vector3.Lerp(ropeStart, targetPosition + AttachOffset, _deploymentTime.EaseOut(DeploymentAnimEasingValue)));
                         break;
                     case RopeDeploymentState.Undeploying:
-                        SET_OBJECT_COORDINATES(rope.GetHandle(), Vector3.Lerp(firstRopePos - new Vector3(0f, 0f, RopeModelSize.Z), targetPosition + AttachOffset, _deploymentTime.EaseIn(DeploymentAnimEasingValue)));
+                        SET_OBJECT_COORDINATES(ropeHandle, Vector3.Lerp(ropeStart, targetPosition + AttachOffset, _deploymentTime.EaseIn(DeploymentAnimEasingValue)));
                         break;
                 }
             }
@@ -523,6 +528,13 @@ namespace CCL.GTAIV
             Rope rope = new Rope(startPos);
             rope.LoadModel(modelHash);
 
+            // A model without height (e.g. failed to load) would make the loop below create objects forever
+            if (rope.RopeModelSize.Z <= 0f)
+            {
+                MARK_MODEL_AS_NO_LONGER_NEEDED((int)rope.RopeModel);
+                return null;
+            }
+
             // Get the ground position of startPos
             startPos = startPos - new Vector3(0f, 0f, rope.RopeModelSize.Z);
             float groundPos = NativeWorld.GetGroundZ(startPos);
@@ -557,6 +569,7 @@ namespace CCL.GTAIV
 
                 // Add the rope object
                 rope.ropeObjects.Add(ropeObj);
+                rope.ropeObjectHandles.Add(ropeObjHandle);
                 ropeTargetPoints.Add(expectedPos);
 
                 // Check if point is below ground

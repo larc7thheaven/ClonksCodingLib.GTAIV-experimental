@@ -267,8 +267,9 @@ namespace CCL.GTAIV
         public NativePed GetTargetedPed()
         {
             IVPool pedPool = IVPools.GetPedPool();
+            int count = (int)pedPool.Count;
 
-            for (int i = 0; i < pedPool.Count; i++)
+            for (int i = 0; i < count; i++)
             {
                 UIntPtr ptr = pedPool.Get(i);
 

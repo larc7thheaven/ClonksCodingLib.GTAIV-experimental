@@ -2,11 +2,23 @@
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Threading;
 
 namespace CCL.GTAIV
 {
     internal static class InternalHelper
     {
+
+        // One Random per thread, each seeded from a shared generator. Creating "new Random()" per call seeds from the
+        // tick count, so calls within the same ~15 ms return the same values; Random itself is not thread-safe.
+        private static readonly Random seedSource = new Random();
+        private static readonly ThreadLocal<Random> threadRandom = new ThreadLocal<Random>(() =>
+        {
+            lock (seedSource)
+                return new Random(seedSource.Next());
+        });
+
+        public static Random Random => threadRandom.Value;
 
         public static string CompressString(string uncompressedString)
         {

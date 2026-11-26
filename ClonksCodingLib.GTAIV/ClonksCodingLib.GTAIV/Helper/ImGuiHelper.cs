@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Windows.Forms;
 
 using IVSDKDotNet;
@@ -15,6 +16,38 @@ namespace CCL.GTAIV
 
         #region Variables
         private static char[] keyModifierSplitChar = new char[] { '+' };
+
+        // IsKeyPressed is typically polled every frame with a constant string, so parse each string only once
+        private struct ParsedKey { public bool HasModifier; public eImGuiKey Modifier; public eImGuiKey Key; }
+        private static readonly ConcurrentDictionary<string, ParsedKey> parsedKeys = new ConcurrentDictionary<string, ParsedKey>();
+
+        private static ParsedKey ParseKey(string key)
+        {
+            ParsedKey parsed = new ParsedKey();
+
+            // Check if contains modifier or not
+            if (key.Contains("+"))
+            {
+                string[] keys = key.Split(keyModifierSplitChar, StringSplitOptions.RemoveEmptyEntries);
+
+                if (keys.Length != 2)
+                {
+                    parsed.Key = keys.Length > 0 ? ConvertKeyToImGuiKey(keys[0].Trim()) : eImGuiKey.ImGuiKey_None;
+                }
+                else
+                {
+                    parsed.HasModifier = true;
+                    parsed.Modifier = ConvertKeyToImGuiKey(keys[0].Trim());
+                    parsed.Key = ConvertKeyToImGuiKey(keys[1].Trim());
+                }
+            }
+            else
+            {
+                parsed.Key = ConvertKeyToImGuiKey(key);
+            }
+
+            return parsed;
+        }
         private static Dictionary<string, eImGuiKey> keyMapping = new Dictionary<string, eImGuiKey>
         {
             // All keys from the System.Windows.Forms.Keys enum
@@ -219,40 +252,27 @@ namespace CCL.GTAIV
             if (string.IsNullOrWhiteSpace(key))
                 return false;
 
-            // Check if contains modifier or not
-            if (key.Contains("+"))
+            if (!parsedKeys.TryGetValue(key, out ParsedKey parsed))
             {
-                string[] keys = key.Split(keyModifierSplitChar, StringSplitOptions.RemoveEmptyEntries);
+                parsed = ParseKey(key);
 
-                if (keys.Length != 2)
-                {
-                    eImGuiKey imGuiKey = ConvertKeyToImGuiKey(keys[0].Trim());
-
-                    if (imGuiKey == eImGuiKey.ImGuiKey_None)
-                        return false;
-
-                    return ImGuiIV.IsKeyPressed(imGuiKey, repeat);
-                }
-                else
-                {
-                    eImGuiKey modifier =    ConvertKeyToImGuiKey(keys[0].Trim());
-                    eImGuiKey imGuiKey =    ConvertKeyToImGuiKey(keys[1].Trim());
-
-                    if (modifier == eImGuiKey.ImGuiKey_None || imGuiKey == eImGuiKey.ImGuiKey_None)
-                        return false;
-
-                    return ImGuiIV.IsKeyDown(modifier) && ImGuiIV.IsKeyPressed(imGuiKey, repeat);
-                }
+                // Bounded, in case a script builds key strings dynamically
+                if (parsedKeys.Count < 1024)
+                    parsedKeys.TryAdd(key, parsed);
             }
-            else
-            {
-                eImGuiKey imGuiKey = ConvertKeyToImGuiKey(key);
 
-                if (imGuiKey == eImGuiKey.ImGuiKey_None)
+            if (parsed.Key == eImGuiKey.ImGuiKey_None)
+                return false;
+
+            if (parsed.HasModifier)
+            {
+                if (parsed.Modifier == eImGuiKey.ImGuiKey_None)
                     return false;
 
-                return ImGuiIV.IsKeyPressed(imGuiKey, repeat);
+                return ImGuiIV.IsKeyDown(parsed.Modifier) && ImGuiIV.IsKeyPressed(parsed.Key, repeat);
             }
+
+            return ImGuiIV.IsKeyPressed(parsed.Key, repeat);
         }
 
     }

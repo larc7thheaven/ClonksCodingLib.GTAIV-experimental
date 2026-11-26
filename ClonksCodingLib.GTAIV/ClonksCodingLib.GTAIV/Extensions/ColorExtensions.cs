@@ -26,7 +26,7 @@ namespace CCL.GTAIV
         /// <returns>The random <see cref="Color"/>.</returns>
         public static Color RandomARGB(this Color color)
         {
-            Random rnd = new Random();
+            Random rnd = InternalHelper.Random;
             return Color.FromArgb(rnd.Next(0, 256), rnd.Next(0, 256), rnd.Next(0, 256), rnd.Next(0, 256));
         }
         /// <summary>
@@ -36,7 +36,7 @@ namespace CCL.GTAIV
         /// <returns>The random <see cref="Color"/>.</returns>
         public static Color RandomRGB(this Color color)
         {
-            Random rnd = new Random();
+            Random rnd = InternalHelper.Random;
             return Color.FromArgb(rnd.Next(0, 256), rnd.Next(0, 256), rnd.Next(0, 256));
         }
 
